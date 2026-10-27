@@ -155,7 +155,8 @@ def fetch_macro():
             print("fred skip", sid, e)
     return out
 
-MODEL = os.environ.get("GEMINI_MODEL") or "gemini-2.5-flash"
+# 依序嘗試；遇到 404（模型不存在或無權限）就換下一個
+CANDIDATES = [m for m in [os.environ.get("GEMINI_MODEL"), "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.5-flash-lite"] if m]
 LAB = {"利多", "利空", "中性"}
 
 def clip(x, n):
@@ -185,11 +186,16 @@ def analyze(data, old):
               "\"news\":[{\"i\":編號,\"s\":\"利多|利空|中性\",\"why\":\"20字內理由\",\"sectors\":[\"相關產業\"]}],"
               "\"stocks\":{\"代號\":\"30字內速評，僅限市場清單中的台股\"}}\n資料：" + json.dumps(ctx, ensure_ascii=False))
     try:
-        r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
-                          headers={"x-goog-api-key": key, "Content-Type": "application/json"},
-                          json={"contents": [{"parts": [{"text": prompt}]}],
-                                "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3}},
-                          timeout=90)
+        r, used = None, None
+        for used in CANDIDATES:
+            r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{used}:generateContent",
+                              headers={"x-goog-api-key": key, "Content-Type": "application/json"},
+                              json={"contents": [{"parts": [{"text": prompt}]}],
+                                    "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3}},
+                              timeout=90)
+            if r.status_code != 404:
+                break
+            print("model not found:", used)
         r.raise_for_status()
         res = json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
         tw = {q["symbol"] for q in data["quotes"] if q["group"] == "台股"}
@@ -199,7 +205,7 @@ def analyze(data, old):
             if isinstance(i, int) and 0 <= i < len(news) and x.get("s") in LAB:
                 nm[str(i)] = {"s": x["s"], "why": clip(x.get("why"), 40),
                               "sectors": [clip(t, 10) for t in (x.get("sectors") or [])[:3]]}
-        return {"hash": sig, "model": MODEL, "generated_at": dt.datetime.now(TZ).isoformat(timespec="seconds"),
+        return {"hash": sig, "model": used, "generated_at": dt.datetime.now(TZ).isoformat(timespec="seconds"),
                 "summary": clip(res.get("summary"), 600), "label": res.get("label") if res.get("label") in ("偏多", "中性", "偏空") else "中性",
                 "score": max(-100, min(100, int(res.get("score", 0)))),
                 "drivers": [clip(x, 80) for x in (res.get("drivers") or [])[:3]], "news": nm,
