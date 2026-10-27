@@ -1,7 +1,7 @@
 name: update-data
 on:
   schedule:
-    - cron: "*/30 0-15 * * 1-5"
+    - cron: "*/30 0-15 * * 1-5"   # UTC，約台灣 08:00–23:30，週一至週五
   workflow_dispatch:
 permissions:
   contents: write
@@ -18,6 +18,8 @@ jobs:
       - run: python fetch_data.py
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
       - name: Commit data.json
         run: |
           git config user.name "github-actions[bot]"
