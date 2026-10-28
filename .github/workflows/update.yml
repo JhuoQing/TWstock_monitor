@@ -39,7 +39,7 @@ jobs:
       contents: read
       actions: write   # 供 keepalive 使用：避免 60 天無活動後排程被停用
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-python@v5
