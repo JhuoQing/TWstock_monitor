@@ -1,0 +1,14 @@
+name = "twstock-admin"
+main = "index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+GH_REPO = "JhuoQing/TWstock_monitor"
+GH_WORKFLOW = "update.yml"
+GH_REF = "main"
+ALLOWED_ORIGIN = "https://jhuoqing.github.io"
+COOLDOWN_SECONDS = "300"
+
+# 選配備援：平日台灣 09:07–13:37 每 30 分鐘（UTC 01:07、01:37 … 05:37），並關掉前請確認 GitHub 排程已穩定
+# [triggers]
+# crons = ["7,37 1-5 * * 1-5"]

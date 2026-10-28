@@ -3,15 +3,18 @@
 import { html } from '../lib/html.js';
 import { ago, stamp } from '../lib/fmt.js';
 import { D, load } from '../lib/app.js';
-import { act, onInput } from '../lib/actions.js';
+import { act, onInput, onSubmit } from '../lib/actions.js';
 import { SOURCE_LABEL, status as marketStatus } from '../lib/market.js';
 import * as store from '../lib/store.js';
+import { WORKER_URL, forceUpdate } from '../lib/admin.js';
+import { loadIndex } from '../lib/api.js';
 import * as layers from './layers.js';
 import { ctx } from './ctx.js';
 
 const $ = (id) => document.getElementById(id);
 let current = null;
 let armedClear = false;
+let forcing = false;
 
 function seg(label, name, options, value) {
   return html`<div class="row"><div>${label}</div><div class="seg" role="group" aria-label="${label}">${options.map(([v, n]) => html`<button type="button" data-act="set" data-name="${name}" data-v="${v}" aria-pressed="${String(String(value) === v)}">${n}</button>`)}</div></div>`;
@@ -42,6 +45,7 @@ function statusHtml() {
     <p class="mute" style="margin:0 0 8px">資料日期 ${ix.trade_date}；最後更新 ${stamp(ix.updated_at)}（${ago(ix.updated_at)}）。${st.stale ? ' 資料已過期，可能是排程暫停或來源異常。' : ''}</p>
     ${ix.sample ? html`<p class="banner">目前顯示的是開發用的範例資料，不是真實行情。</p>` : ''}
     ${src.map(([k, v]) => html`<div class="src"><span class="${v.ok ? 'flat' : 'up'}" aria-hidden="true">${v.ok ? '●' : '▲'}</span><span>${SOURCE_LABEL[k] || k}${v.got != null ? html`<small>　${v.got}/${v.total} 檔</small>` : ''}${!v.ok && v.error ? html`<small>　${v.error}</small>` : ''}</span><small>${v.ok ? '正常' : '失敗，沿用舊資料'}</small></div>`)}
+    ${WORKER_URL ? html`<form class="row" data-submit="force-update" style="gap:8px;flex-wrap:wrap;margin-top:12px"><label for="adm-pw" style="flex:1 1 100%"><div>強制更新（管理員）</div><small>輸入管理密碼後，立即觸發一次資料更新，約 2 分鐘完成</small></label><input id="adm-pw" name="password" type="password" autocomplete="current-password" placeholder="管理密碼" style="flex:1 1 160px" required><button type="submit" class="btn btn--sm" ${forcing ? 'disabled' : ''}>${forcing ? '更新中…' : '強制更新'}</button></form>` : ''}
     <p class="note" style="margin-top:12px">免費來源可能延遲或暫時失效；失敗的項目會沿用上一次成功的資料並標示「舊資料」。價格並非即時，請以券商報價為準。</p>
     <div class="foot"><button type="button" class="btn" data-act="refresh">立即重新讀取</button><button type="button" class="btn btn--lamp" data-act="close-layer">關閉</button></div>`;
 }
@@ -99,6 +103,37 @@ export function bind() {
     ctx.toast('已清除本機資料');
     ctx.rerender();
     paint();
+  });
+  onSubmit('force-update', async (form) => {
+    if (forcing) return;
+    const pw = form.elements.password.value;
+    form.elements.password.value = '';
+    forcing = true;
+    paint();
+    const r = await forceUpdate(pw);
+    if (!r.ok) {
+      forcing = false;
+      paint();
+      return ctx.toast(r.error);
+    }
+    ctx.toast('已觸發更新，約 2 分鐘後完成');
+    const before = D.index?.updated_at;
+    const t0 = Date.now();
+    // 每 15 秒看一次 index.json，更新時間變了就重新載入畫面（最多等 6 分鐘）
+    const timer = setInterval(async () => {
+      try {
+        const ix = await loadIndex();
+        if (ix?.updated_at && ix.updated_at !== before) {
+          clearInterval(timer);
+          forcing = false;
+          await load();
+          ctx.rerender();
+          paint();
+          ctx.toast('資料已更新');
+        }
+      } catch { /* 部署切換瞬間可能暫時失敗，下一輪再試 */ }
+      if (Date.now() - t0 > 360000) { clearInterval(timer); forcing = false; paint(); ctx.toast('等待逾時，請稍後按「立即重新讀取」'); }
+    }, 15000);
   });
   act('refresh', async () => {
     await load();
