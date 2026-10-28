@@ -21,6 +21,10 @@ jobs:
           cache-dependency-path: requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
+      - name: Sample data builds through the real pipeline
+        run: |
+          python tools/make_sample_data.py
+          python -c "import json; d=json.load(open('web/data/index.json')); assert d['quotes'] and d['schema']==2, 'bad index'; print(len(d['quotes']),'quotes')"
       - name: symbols.json is valid
         run: python -c "from pipeline.quotes import load_symbols; s=load_symbols('symbols.json'); print(len(s),'symbols'); assert any(x.symbol=='^TWII' for x in s)"
 

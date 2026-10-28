@@ -74,6 +74,8 @@ function chrome() {
 
 function onRoute() {
   const r = router.parse(location.hash);
+  // 舊版連結（#2330.TW）改寫成新格式，不新增歷史紀錄
+  if (location.hash && !location.hash.startsWith('#/')) history.replaceState(null, '', router.href(r));
   if (r.sym) {
     if (!layers.isOpen('sheet')) layers.open('sheet', { onClose: onSheetClosed, focus: '[data-act="close-layer"]' });
     detail.show(r.sym);

@@ -410,3 +410,4 @@ details.arch .arch__i { padding: 8px 0 12px; border-top: 1px dashed var(--edge);
 
 kbd { font: 11.5px var(--font-text); padding: 0 6px; border: 1px solid var(--edge); border-radius: 5px; color: var(--mute); }
 .hero__chart .tc-over { cursor: default; }
+#view:focus { outline: none; }
