@@ -173,3 +173,21 @@ def test_load_rules_filters_bad_entries(tmp_path):
 def test_send_telegram_is_noop_without_secrets(monkeypatch):
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN", raising=False)
     assert notify.send_telegram("x") is False
+
+
+def test_env_float_tolerates_empty_and_bad_values(monkeypatch):
+    # GitHub Actions 未定義的 vars.* 會變成空字串，這曾讓整次更新崩潰
+    for raw in ["", "  ", "abc", "-3"]:
+        monkeypatch.setenv("AI_MIN_INTERVAL_HOURS", raw)
+        assert ai.env_float("AI_MIN_INTERVAL_HOURS", 20.0) == 20.0
+    monkeypatch.setenv("AI_MIN_INTERVAL_HOURS", "6")
+    assert ai.env_float("AI_MIN_INTERVAL_HOURS", 20.0) == 6.0
+    monkeypatch.delenv("AI_MIN_INTERVAL_HOURS")
+    assert ai.env_float("AI_MIN_INTERVAL_HOURS", 20.0) == 20.0
+
+
+def test_maybe_generate_with_empty_interval_env(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("AI_MIN_INTERVAL_HOURS", "")
+    r, new = ai.maybe_generate(MACRO, QUOTES, None, now=NOW, caller=lambda p, k: (GOOD, "m"))
+    assert new and r["model"] == "m"
