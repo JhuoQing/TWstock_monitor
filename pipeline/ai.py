@@ -126,6 +126,16 @@ def sanitize(res: dict) -> dict:
     }
 
 
+def env_float(name: str, default: float) -> float:
+    """讀環境變數；沒設定、空字串（GitHub 未定義的 vars 會變成空字串）或格式錯誤都回傳預設值。"""
+    raw = (os.environ.get(name) or "").strip()
+    try:
+        v = float(raw)
+    except ValueError:
+        return default
+    return v if v >= 0 else default
+
+
 def maybe_generate(
     macro: list[dict], quotes: list[dict], prev: dict | None, *, now: dt.datetime | None = None,
     caller: Any = None,
@@ -136,7 +146,7 @@ def maybe_generate(
         return (prev if prev and macro else None), False
     now = now or dt.datetime.now(TZ)
     sig = macro_signature(macro)
-    min_hours = float(os.environ.get("AI_MIN_INTERVAL_HOURS", DEFAULT_MIN_HOURS))
+    min_hours = env_float("AI_MIN_INTERVAL_HOURS", DEFAULT_MIN_HOURS)
     if not should_generate(prev, sig, now, min_hours):
         return prev, False
     ctx = build_context(macro, quotes)

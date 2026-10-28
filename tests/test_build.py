@@ -208,3 +208,39 @@ def test_clean_repairs_bad_ohlc_and_nan():
     df.iloc[5, df.columns.get_loc("High")] = 0.0
     out = Q._clean(df)
     assert len(out) == 9 and (out["High"] >= out["Close"]).all() and (out["Low"] <= out["Close"]).all()
+
+
+def test_ai_step_crash_never_fails_the_build(tmp_path, symbols_file, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+
+    def boom(*a, **k):
+        raise RuntimeError("unexpected")
+
+    monkeypatch.setattr("pipeline.ai.maybe_generate", boom)
+    f = make_fx(macro=lambda: [{"id": "A", "name": "a", "value": 1, "prev": 1, "date": "d", "unit": "%", "freq": "m", "hist": []}])
+    idx = run(symbols_file, tmp_path / "o", fx_=f)
+    assert idx["quotes"] and idx["ai"] is None
+
+
+def test_non_json_response_error_explains_itself(monkeypatch):
+    import requests
+    from pipeline import http
+
+    class R:
+        url = "https://example.com/api?x=1"
+        status_code = 200
+        headers = {"content-type": "text/html"}
+        content = b"<html>blocked</html>"
+        text = "<html>blocked</html>"
+
+        def json(self):
+            raise requests.exceptions.JSONDecodeError("Expecting value", "", 0)
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(http, "get", lambda *a, **k: R())
+    with pytest.raises(ValueError) as e:
+        http.get_json("https://example.com/api")
+    msg = str(e.value)
+    assert "status=200" in msg and "text/html" in msg and "blocked" in msg and "?x=1" not in msg

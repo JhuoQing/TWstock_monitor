@@ -207,7 +207,11 @@ def build(symbols_path: Path, out_dir: Path, state: PrevState, *, fx: SimpleName
     prev_ai = prev.get("ai")
     ai_report, ai_new = (None, False)
     if not skip_ai:
-        ai_report, ai_new = ai.maybe_generate(macro or [], qlist, prev_ai, now=now, caller=fx.ai_caller)
+        try:
+            ai_report, ai_new = ai.maybe_generate(macro or [], qlist, prev_ai, now=now, caller=fx.ai_caller)
+        except Exception as e:  # noqa: BLE001 - AI 是加值功能，任何錯誤都不能讓整次資料更新失敗
+            log.warning("ai step failed: %s %s", type(e).__name__, str(e)[:160])
+            ai_report, ai_new = prev_ai, False
     else:
         ai_report = prev_ai
     macro_history = state.get("macro_history.json") or []
