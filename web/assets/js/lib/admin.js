@@ -1,7 +1,7 @@
 // 強制更新：把管理密碼送到 Cloudflare Worker，由 Worker 驗證後觸發 GitHub Actions。
 // 密碼只在送出時存在記憶體，不寫入 localStorage。部署 Worker 後把網址填在下面（見 worker/README.md）。
 
-export const WORKER_URL = ''; // 例如 'https://twstock-admin.<你的子網域>.workers.dev'
+export const WORKER_URL = 'https://twstock-admin.andy85670.workers.dev';
 
 const MSG = {
   unauthorized: '密碼錯誤',
