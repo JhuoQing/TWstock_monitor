@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark" data-ud="tw">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#080b1c">
+<meta name="description" content="台股夜盤：加權指數、法人籌碼、類股熱力圖、個股技術圖與總體經濟，全部在一個頁面看完。">
+<title>台股夜盤</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="assets/css/app.css">
+<script src="assets/js/boot.js"></script>
+<script type="module" src="assets/js/main.js"></script>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-overview" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 20V11h3v9M10.5 20V6h3v14M16 20v-7h3v7"/></symbol>
+  <symbol id="i-market" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="10" rx="1"/><rect x="13" y="3" width="8" height="6" rx="1"/><rect x="13" y="11" width="8" height="10" rx="1"/><rect x="3" y="15" width="8" height="6" rx="1"/></symbol>
+  <symbol id="i-mine" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+  <symbol id="i-news" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM18 9h2v9a2 2 0 0 1-2 2M8 8h7M8 12h7M8 16h4"/></symbol>
+  <symbol id="i-macro" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+  <symbol id="i-tower" viewBox="0 0 18 26" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M9 1v4M6.5 22l.8-3h3.4l.8 3M5.5 19h7M7 19l.7-3h2.6l.7 3M7.7 16l.6-3h1.4l.6 3M8.3 13l.4-3h.6l.4 3M3 25h12"/></symbol>
+</svg>
+
+<a class="skip" href="#view">跳到主要內容</a>
+<div class="tape" id="tape" aria-label="重點行情跑馬燈" hidden></div>
+
+<header class="top">
+  <div class="wrap top__in">
+    <a class="brand" href="#/overview" aria-label="台股夜盤 首頁"><svg aria-hidden="true"><use href="#i-tower"/></svg>台股夜盤</a>
+    <nav class="nav" aria-label="主要導覽" id="nav">
+      <a class="nav__a" href="#/overview" data-nav="overview"><svg class="ico" aria-hidden="true"><use href="#i-overview"/></svg>總覽</a>
+      <a class="nav__a" href="#/market" data-nav="market"><svg class="ico" aria-hidden="true"><use href="#i-market"/></svg>市場</a>
+      <a class="nav__a" href="#/mine" data-nav="mine"><svg class="ico" aria-hidden="true"><use href="#i-mine"/></svg>自選</a>
+      <a class="nav__a" href="#/news" data-nav="news"><svg class="ico" aria-hidden="true"><use href="#i-news"/></svg>新聞</a>
+      <a class="nav__a" href="#/macro" data-nav="macro"><svg class="ico" aria-hidden="true"><use href="#i-macro"/></svg>總經</a>
+    </nav>
+    <div class="top__r">
+      <button class="searchbtn" type="button" data-act="palette" aria-label="搜尋股票或功能（快速鍵 Ctrl K）"><svg width="16" height="16" aria-hidden="true"><use href="#i-search"/></svg><span>搜尋股票、功能</span><kbd>Ctrl K</kbd></button>
+      <button class="status" type="button" id="status" data-act="status" aria-label="資料狀態"><i class="lamp"></i><span class="t" id="status-t">載入中</span><span class="upd" id="status-u"></span></button>
+      <button class="icon-btn" type="button" data-act="settings" aria-label="設定"><svg aria-hidden="true"><use href="#i-settings"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main id="view" class="wrap" tabindex="-1" aria-live="polite">
+  <div class="hero" aria-busy="true">
+    <div class="skel" style="height:34px;width:180px;margin-bottom:14px"></div>
+    <div class="skel" style="height:110px;width:min(100%,520px);margin-bottom:14px"></div>
+    <div class="skel" style="height:260px;width:100%"></div>
+  </div>
+  <noscript><p class="err"><b>需要 JavaScript</b>這個儀表板需要啟用 JavaScript 才能顯示。</p></noscript>
+</main>
+
+<footer class="wrap foot" id="foot"></footer>
+
+<div class="scrim" id="scrim" data-act="close-layer"></div>
+<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="個股詳情" aria-hidden="true"></aside>
+<div class="pal" id="pal" role="dialog" aria-modal="true" aria-label="搜尋" aria-hidden="true">
+  <input class="pal__in" id="pal-in" type="text" role="combobox" aria-expanded="true" aria-controls="pal-list" aria-autocomplete="list" autocomplete="off" spellcheck="false" placeholder="輸入代號或名稱，例如 2330、台積電" data-input="pal-q">
+  <div class="pal__list" id="pal-list" role="listbox" aria-label="搜尋結果"></div>
+  <div class="pal__foot">↑↓ 選擇　Enter 開啟　Esc 關閉</div>
+</div>
+<div class="dlg" id="dlg" role="dialog" aria-modal="true" aria-hidden="true"></div>
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

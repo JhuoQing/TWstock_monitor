@@ -1,17 +1,43 @@
 name: update-data
+
+# 產生資料並直接部署到 GitHub Pages（不再把 data.json commit 進倉庫）。
+# 時間為 UTC：台灣時間 = UTC + 8。
 on:
   schedule:
-    - cron: "7,37 0-15 * * 1-5"
+    - cron: "20 0 * * 1-5"        # 08:20 開盤前
+    - cron: "7,37 1-5 * * 1-5"    # 09:07–13:37 盤中，每 30 分鐘
+    - cron: "10 7,9,13 * * 1-5"   # 15:10 / 17:10 / 21:10 盤後（法人、融資券陸續公布）
+    - cron: "20 21,22 * * 1-5"    # 05:20 / 06:20 美股收盤後
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "pipeline/**"
+      - "symbols.json"
+      - "alerts.json"
+      - "requirements.txt"
+      - ".github/workflows/update.yml"
   workflow_dispatch:
+    inputs:
+      skip_ai:
+        description: "略過 AI 總經報告"
+        type: boolean
+        default: false
+
 permissions:
-  contents: write
+  contents: read
+
 concurrency:
-  group: update-data
+  group: pages
   cancel-in-progress: false
+
 jobs:
-  update:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: write   # 供 keepalive 使用：避免 60 天無活動後排程被停用
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,18 +47,39 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - run: python fetch_data.py
+      - name: Build data
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-      - name: Commit data.json
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_MIN_INTERVAL_HOURS: ${{ vars.AI_MIN_INTERVAL_HOURS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PREV_BASE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data.json
-          git diff --cached --quiet && exit 0
-          git commit -m "data update $(date -u +%FT%TZ)"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:${{ github.ref_name }}
+          args=""
+          if [ "${{ inputs.skip_ai }}" = "true" ]; then args="--skip-ai"; fi
+          python -m pipeline.build --out web/data $args
+      - name: Record dependency versions
+        run: pip freeze | grep -iE "^(requests|yfinance|pandas|numpy)==" || true
+      - name: Keepalive (re-enable scheduled workflow)
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable update.yml --repo "${{ github.repository }}" || true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

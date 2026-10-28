@@ -1,0 +1,4 @@
+{
+  "_comment": "選用：伺服器端價格警示。需在 GitHub Secrets 設定 TELEGRAM_BOT_TOKEN 與 TELEGRAM_CHAT_ID 才會推播。op 可用 >= 或 <=。每條規則只在由未觸發轉為觸發時通知一次。",
+  "rules": []
+}

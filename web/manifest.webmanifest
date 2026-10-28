@@ -1,0 +1,17 @@
+{
+  "name": "台股夜盤",
+  "short_name": "台股夜盤",
+  "description": "加權指數、法人籌碼、類股熱力圖與個股技術圖",
+  "lang": "zh-Hant",
+  "start_url": "./#/overview",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080b1c",
+  "theme_color": "#080b1c",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
