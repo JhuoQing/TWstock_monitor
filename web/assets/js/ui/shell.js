@@ -8,7 +8,7 @@ import { link } from './components.js';
 import * as store from '../lib/store.js';
 
 const $ = (id) => document.getElementById(id);
-const TAPE = ['^TWII', '^TWOII', '2330.TW', '2317.TW', '2454.TW', '^GSPC', '^IXIC', '^SOX', 'TSM', 'TWD=X', '^N225', 'GC=F', 'BTC-USD'];
+const TAPE = ['^TWII', '2330.TW', '2317.TW', '2454.TW', '^GSPC', '^IXIC', '^SOX', 'TSM', 'TWD=X', '^N225', 'GC=F', 'BTC-USD'];
 
 export function applySettings() {
   const s = store.settings();

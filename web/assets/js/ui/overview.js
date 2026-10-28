@@ -10,7 +10,7 @@ import { spark, columns, volumeBars, breadthBar } from '../charts/mini.js';
 import { TimeChart } from '../charts/chart.js';
 import '../charts/skyline.js';
 
-const MINI = ['^TWOII', '^GSPC', 'TSM', 'TWD=X'];
+const MINI = ['^GSPC', '^IXIC', 'TSM', 'TWD=X'];
 const GLOBAL = ['^GSPC', '^IXIC', '^SOX', 'TSM', '^N225', '^KS11', '^VIX', 'TWD=X'];
 const MACRO_PICK = ['FEDFUNDS', 'DGS10', 'T10Y2Y', 'CPIAUCSL'];
 
