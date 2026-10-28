@@ -1,0 +1,25 @@
+name: probe-sources
+
+# 手動執行：實際連線各資料來源並回報解析是否成功，以及回傳資料的欄位形狀。
+# 證交所、櫃買、期交所偶爾調整欄位，這支用來快速確認哪個來源需要修正。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Probe
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python tools/probe_sources.py | tee "$GITHUB_STEP_SUMMARY"

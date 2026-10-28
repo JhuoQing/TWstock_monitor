@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+node_modules/
+# 開發用樣本資料 / 本機預覽（正式資料由 Actions 產生並直接部署）
+web/data/
+.preview/
+.DS_Store
