@@ -1,7 +1,7 @@
 // 對話框：設定（主題、顏色慣例、備份）與資料來源狀態。
 
 import { html } from '../lib/html.js';
-import { ago, stamp } from '../lib/fmt.js';
+import { ago, stamp, secs } from '../lib/fmt.js';
 import { D, load } from '../lib/app.js';
 import { act, onInput, onSubmit } from '../lib/actions.js';
 import { SOURCE_LABEL, status as marketStatus } from '../lib/market.js';
@@ -47,7 +47,13 @@ function liveRow() {
   else if (!v.window) { state = '非交易時段'; note = '平日 08:45–13:40 才會啟動'; }
   else if (v.error) { state = '失敗，顯示收盤價'; note = v.error; }
   else if (!v.fresh) { state = '連線中'; }
-  else { note = `${v.count} 檔　${stamp(v.at)}`; }
+  else {
+    const parts = [`${v.count} 檔`];
+    if (v.delay != null) parts.push(`延遲 ${secs(v.delay)}`);
+    if (v.misDelay) parts.push(`證交所宣告 ${secs(v.misDelay / 1000)}`);
+    parts.push(`每 15 秒更新　${stamp(v.at)}`);
+    note = parts.join('　');
+  }
   const ok = v.configured && v.enabled && v.window && !v.error;
   return html`<div class="src"><span class="${ok ? 'flat' : 'up'}" aria-hidden="true">${ok ? '●' : '▲'}</span><span>盤中即時報價（證交所 MIS）${note ? html`<small>　${note}</small>` : ''}</span><small>${state}</small></div>`;
 }

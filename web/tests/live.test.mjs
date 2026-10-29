@@ -51,6 +51,27 @@ test('isoDate 轉換 MIS 的日期格式', () => {
   assert.equal(live.isoDate(null), null);
 });
 
+test('quoteTime 以台北時間解讀 MIS 的日期與時間', () => {
+  // 2026-10-29 10:31:05 台北 = 02:31:05Z
+  assert.equal(live.quoteTime({ d: '20261029', t: '10:31:05' }), Date.parse('2026-10-29T02:31:05Z'));
+  // 沒有可用的 t 就退回 tlong
+  assert.equal(live.quoteTime({ d: '20261029', t: '-', ts: 1700000000000 }), 1700000000000);
+  assert.equal(live.quoteTime({ d: '-', t: '-' }), null);
+  assert.equal(live.quoteTime(null), null);
+});
+
+test('delaySec 算出報價距今幾秒，時鐘不對時不顯示', () => {
+  const e = { d: '20261029', t: '10:31:05' };
+  const quoted = Date.parse('2026-10-29T02:31:05Z');
+  assert.equal(live.delaySec(e, quoted + 12_000), 12);
+  assert.equal(live.delaySec(e, quoted + 500), 1); // 四捨五入
+  assert.equal(live.delaySec(e, quoted), 0);
+  assert.equal(live.delaySec(e, quoted - 5_000), 0); // 時鐘小幅落後 → 當作 0，不顯示負數
+  assert.equal(live.delaySec(e, quoted - 120_000), null); // 時鐘明顯不對 → 不顯示
+  assert.equal(live.delaySec(e, quoted + 3600_000), null); // 大到不合理 → 不顯示
+  assert.equal(live.delaySec(null), null);
+});
+
 test('setTargets 去除重複頻道並回報是否有變動', () => {
   live.reset();
   assert.equal(live.setTargets([{ key: '^TWII', ch: 'tse_t00.tw' }, { key: 'x', ch: 'tse_t00.tw' }]), true);
@@ -83,6 +104,7 @@ test('tick 成功後覆蓋報價，失敗時保留原狀並記錄原因', async 
   assert.equal(live.get('0050.TW'), null); // 沒追的標的不會有值
   assert.equal(live.info().count, 2);
   assert.equal(live.info().error, null);
+  assert.equal(typeof live.get('^TWII').t, 'string');
 
   // Worker 回錯誤：維持上一次的值，並把原因留給「資料狀態」顯示
   const badFetch = () => Promise.resolve({ ok: false, status: 502, json: () => Promise.resolve({ ok: false, error: 'upstream' }) });
