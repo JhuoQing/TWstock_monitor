@@ -42,6 +42,29 @@ const compactToday = (now) => todayTW(now).replace(/-/g, '');
 /** MIS 的 'YYYYMMDD' → 'YYYY-MM-DD'；拿不到回傳 null。 */
 export const isoDate = (e) => (e?.d && /^\d{8}$/.test(e.d) ? `${e.d.slice(0, 4)}-${e.d.slice(4, 6)}-${e.d.slice(6, 8)}` : null);
 
+/** 這筆報價在證交所的成交時間（epoch ms）。MIS 的 d／t 是台北時間，tlong 是備援。 */
+export function quoteTime(e) {
+  if (!e) return null;
+  const iso = isoDate(e);
+  if (iso && /^\d{1,2}:\d{2}:\d{2}$/.test(e.t || '')) {
+    const t = Date.parse(`${iso}T${e.t.padStart(8, '0')}+08:00`);
+    if (Number.isFinite(t)) return t;
+  }
+  return Number.isFinite(e.ts) ? e.ts : null;
+}
+
+/** 報價距今幾秒：MIS 本身的延遲 ＋ Worker 快取 ＋ 輪詢間隔，全部算進去。
+ *
+ * 這個數字依賴使用者電腦的時鐘。時鐘明顯不對（算出負數）或數字大到不合理時回傳 null，
+ * 寧可不顯示，也不要顯示一個騙人的秒數。 */
+export function delaySec(e, now = Date.now()) {
+  const t = quoteTime(e);
+  if (t == null) return null;
+  const s = (now - t) / 1000;
+  if (s < -60 || s > 1800) return null;
+  return Math.max(0, Math.round(s));
+}
+
 /** 這筆即時資料能不能用來覆蓋：必須是今天，而且今天已經有成交。 */
 export function usable(e, now = new Date()) {
   if (!e || !Number.isFinite(e.price)) return false;
@@ -57,6 +80,7 @@ let timer = null;
 let fails = 0;
 let lastAt = 0;
 let lastError = null;
+let misDelay = null; // MIS 自己宣告的延遲（毫秒）
 let enabled = true;
 let running = false;
 
@@ -82,6 +106,9 @@ export function info(now = Date.now()) {
     at: lastAt || null,
     count: fresh ? [...byKey.keys()].filter((k) => get(k, now)).length : 0,
     error: lastError,
+    misDelay,
+    // 以加權指數為準的實際延遲，給「資料狀態」顯示
+    delay: fresh ? delaySec(byKey.get('^TWII') || byKey.values().next().value, now) : null,
   };
 }
 
@@ -150,6 +177,7 @@ export async function tick(fetchFn = fetch) {
     }
     lastAt = Date.now();
     lastError = null;
+    misDelay = Number.isFinite(j.delay) ? j.delay : null;
     fails = 0;
     emit();
     return true;
@@ -219,5 +247,6 @@ export function reset() {
   fails = 0;
   lastAt = 0;
   lastError = null;
+  misDelay = null;
   enabled = true;
 }
