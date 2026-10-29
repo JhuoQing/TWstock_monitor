@@ -2,7 +2,6 @@
   "_comment": "追蹤清單。symbol 為 Yahoo Finance 代號；name 為預設名稱（台股會以證交所名稱覆蓋）；focus=true 的標的會出現在首頁「台股焦點」。抓不到的代號會自動略過，不影響其他標的。",
   "symbols": [
     {"symbol": "^TWII", "name": "加權指數", "group": "台股", "kind": "index"},
-    {"symbol": "^TWOII", "name": "櫃買指數", "group": "台股", "kind": "index"},
 
     {"symbol": "2330.TW", "name": "台積電", "group": "台股", "kind": "stock", "focus": true},
     {"symbol": "2317.TW", "name": "鴻海", "group": "台股", "kind": "stock", "focus": true},
@@ -35,12 +34,12 @@
     {"symbol": "2337.TW", "name": "旺宏", "group": "台股", "kind": "stock"},
     {"symbol": "3661.TW", "name": "世芯-KY", "group": "台股", "kind": "stock"},
     {"symbol": "3443.TW", "name": "創意", "group": "台股", "kind": "stock"},
-    {"symbol": "3529.TW", "name": "力旺", "group": "台股", "kind": "stock"},
+    {"symbol": "3529.TWO", "name": "力旺", "group": "台股", "kind": "stock"},
     {"symbol": "2376.TW", "name": "技嘉", "group": "台股", "kind": "stock"},
     {"symbol": "2353.TW", "name": "宏碁", "group": "台股", "kind": "stock"},
     {"symbol": "2449.TW", "name": "京元電子", "group": "台股", "kind": "stock"},
     {"symbol": "3017.TW", "name": "奇鋐", "group": "台股", "kind": "stock"},
-    {"symbol": "3324.TW", "name": "雙鴻", "group": "台股", "kind": "stock"},
+    {"symbol": "3324.TWO", "name": "雙鴻", "group": "台股", "kind": "stock"},
     {"symbol": "2368.TW", "name": "金像電", "group": "台股", "kind": "stock"},
     {"symbol": "8046.TW", "name": "南電", "group": "台股", "kind": "stock"},
     {"symbol": "2474.TW", "name": "可成", "group": "台股", "kind": "stock"},
