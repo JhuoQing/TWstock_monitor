@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as live from '../assets/js/lib/live.js';
-import { normalizeMis } from '../../worker/index.js';
+import { normalizeMis, normalizeYahoo, yahooSymbol } from '../../worker/index.js';
 import { todayTW } from '../assets/js/lib/fmt.js';
 
 const today = () => todayTW(new Date()).replace(/-/g, '');
@@ -167,4 +167,58 @@ test('normalizeMis 容忍空的或壞掉的回應', () => {
   assert.deepEqual(normalizeMis({}), []);
   assert.deepEqual(normalizeMis(null), []);
   assert.deepEqual(normalizeMis({ msgArray: 'nope' }), []);
+});
+
+// ── 後備來源：Yahoo ──
+
+test('yahooSymbol 把 MIS 頻道轉成 Yahoo 代號', () => {
+  assert.equal(yahooSymbol('tse_t00.tw'), '^TWII');
+  assert.equal(yahooSymbol('otc_o00.tw'), '^TWOII');
+  assert.equal(yahooSymbol('tse_2330.tw'), '2330.TW');
+  assert.equal(yahooSymbol('otc_6488.tw'), '6488.TWO');
+  assert.equal(yahooSymbol('tse_00679B.tw'), '00679B.TW');
+  assert.equal(yahooSymbol('tse_xyz.tw'), null); // 其他指數沒有對應代號
+  assert.equal(yahooSymbol('garbage'), null);
+  assert.equal(yahooSymbol(null), null);
+});
+
+test('normalizeYahoo 整理成跟 MIS 一樣的形狀，時間換算成台北', () => {
+  const ts = Date.parse('2026-10-29T02:33:00Z') / 1000; // 台北 10:33:00
+  const q = normalizeYahoo({ chart: { result: [{ meta: {
+    regularMarketPrice: 27543.21, chartPreviousClose: 27499, regularMarketTime: ts,
+    regularMarketOpen: 27600, regularMarketDayHigh: 27650, regularMarketDayLow: 27500,
+    regularMarketVolume: 4200, exchangeDataDelayedBy: 1200,
+  } }] } }, 'tse_t00.tw');
+  assert.equal(q.ch, 'tse_t00.tw');
+  assert.equal(q.price, 27543.21);
+  assert.equal(q.chg, 44.21);
+  assert.equal(q.pct, 0.16);
+  assert.equal(q.d, '20261029');
+  assert.equal(q.t, '10:33:00');
+  assert.equal(q.ts, ts * 1000);
+  assert.equal(q.delayed, 1200);
+});
+
+test('normalizeYahoo 接受毫秒時間戳，並擋掉缺資料的回應', () => {
+  const ms = Date.parse('2026-10-29T02:33:00Z');
+  assert.equal(normalizeYahoo({ chart: { result: [{ meta: { regularMarketPrice: 1, regularMarketTime: ms } }] } }, 'x').ts, ms);
+  assert.equal(normalizeYahoo({ chart: { result: [{ meta: { regularMarketTime: ms } }] } }, 'x'), null); // 沒有價格
+  assert.equal(normalizeYahoo({ chart: { result: [] } }, 'x'), null);
+  assert.equal(normalizeYahoo({}, 'x'), null);
+  assert.equal(normalizeYahoo(null, 'x'), null);
+});
+
+test('退到 Yahoo 時每筆報價都標示來源，狀態也看得出來', async () => {
+  live.reset();
+  live.setTargets([{ key: '^TWII', ch: 'tse_t00.tw' }]);
+  const body = { ok: true, src: 'yahoo', at: new Date().toISOString(), delay: 1200000, q: [
+    { ch: 'tse_t00.tw', price: 27543.21, prev: 27499, chg: 44.21, pct: 0.16, vol: 4200, d: today(), t: '10:33:00' },
+  ] };
+  assert.equal(await live.tick(() => Promise.resolve({ ok: true, json: () => Promise.resolve(body) })), true);
+  assert.equal(live.get('^TWII').src, 'yahoo');
+  assert.equal(live.info().src, 'yahoo');
+  assert.equal(live.sourceOf('yahoo').label, 'Yahoo');
+  assert.equal(live.sourceOf('mis').label, '即時');
+  assert.equal(live.sourceOf(null).label, '即時'); // 舊版 Worker 沒有 src 欄位時當成 MIS
+  live.reset();
 });

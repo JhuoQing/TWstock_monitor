@@ -51,6 +51,29 @@ curl -s "https://twstock-admin.<子網域>.workers.dev/live?ch=tse_t00.tw|tse_23
 `?raw=1` 會回 MIS 的原始 JSON，欄位對不上時用它來看實際形狀。
 
 ## 即時行情說明
+
+`/live` 有兩層來源，第一層失敗會自動退到第二層：
+
+| 順位 | 來源 | 延遲 | 備註 |
+| --- | --- | --- | --- |
+| 1 | 證交所 MIS | 約 5–15 秒 | 先取首頁 cookie（快取 10 分鐘）再打 API，整組標頭照真的瀏覽器送 |
+| 2 | Yahoo `v8/finance/chart` | 約 15–20 分鐘 | 一次最多 15 檔，延遲由 `exchangeDataDelayedBy` 告知 |
+
+回應裡的 `src` 欄位會寫是哪一個（`mis` 或 `yahoo`），網頁照它決定標籤要寫「即時」還是「Yahoo」。
+
+**診斷**：`?debug=1` 會在回應裡附上 `tried` 陣列，列出每一層失敗的原因，例如
+
+```bash
+curl -s "https://twstock-admin.<子網域>.workers.dev/live?ch=tse_t00.tw&debug=1"
+# {"ok":true,"src":"yahoo",…,"tried":[{"src":"mis","error":"mis_http_520"}]}
+```
+
+常見的 MIS 錯誤：
+
+- `mis_http_520` — Cloudflare 的「來源回了無法解析的回應」。通常是被當成機器人：cookie 沒拿到或標頭不夠像瀏覽器。
+- `mis_http_403` / `404` — 明確拒絕，多半是擋機房 IP，Worker 這端改不了，靠 Yahoo 後備。
+- `rtcode` 非 `0000` — 連得上但參數有問題，`?raw=1` 可以看原始回應。
+
 - 頻道格式 `tse_2330.tw`（上市）、`otc_6488.tw`（上櫃）、`tse_t00.tw`（加權指數）、`otc_o00.tw`（櫃買指數），
   一次最多 40 個，不符格式的會被丟掉。
 - 相同的標的組合有 **10 秒邊緣快取**，所以多開分頁或多人看，對 MIS 的請求不會等比增加。

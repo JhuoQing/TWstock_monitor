@@ -3,6 +3,7 @@
 import { html } from '../lib/html.js';
 import { num, int, pct, signed, cls, price, yi, dateShort, secs } from '../lib/fmt.js';
 import { D, resolve, rows } from '../lib/app.js';
+import { sourceOf } from '../lib/live.js';
 import { scan } from '../lib/signals.js';
 import { href } from '../lib/router.js';
 import { head, empty, quoteRow, newsList, link, netBar } from './components.js';
@@ -73,7 +74,8 @@ function macroLine(m) {
 /** hero 價格底下那行小字：即時報價顯示成交時間與延遲，否則顯示資料日期。 */
 function heroStamp(t) {
   if (t.live) {
-    return html`<span class="tag tag--live" title="證交所即時行情，每 15 秒更新一次">即時</span> ${t.liveAt || ''}${t.liveDelay == null ? '' : html` · 延遲 ${secs(t.liveDelay)}`}`;
+    const s = sourceOf(t.liveSrc);
+    return html`<span class="tag tag--live" title="${s.title}">${s.label}</span> ${t.liveAt || ''}${t.liveDelay == null ? '' : html` · 延遲 ${secs(t.liveDelay)}`}`;
   }
   return html`${dateShort(t.date)} ${t.stale ? '（舊資料）' : ''}`;
 }
