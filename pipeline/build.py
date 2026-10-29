@@ -25,7 +25,7 @@ from typing import Any, Callable
 from . import SCHEMA_VERSION, ai, macro as macro_mod, news as news_mod, notify, quotes as quotes_mod
 from . import taifex, tpex, twse
 from .state import PrevState
-from .util import TZ, clip, safe_filename
+from .util import TZ, clip, rnd, safe_filename
 from .validate import validate_index
 
 log = logging.getLogger("pipeline.build")
@@ -62,6 +62,59 @@ def merge_hist(prev: list[dict] | None, entry: dict | None, key: str = "date", k
         hist.append(entry)
     hist.sort(key=lambda h: h.get(key) or "")
     return hist[-keep:]
+
+
+def apply_official_index(qlist: list[dict], taiex: dict, turnover_hist: list[dict] | None) -> dict | None:
+    """用證交所 FMTQIK 的官方加權指數收盤，補上 Yahoo 還沒更新的交易日。
+
+    Yahoo 的 ^TWII 日 K 有時落後好幾個交易日（整批下載被限流時尤其明顯），首頁報價就會停在
+    舊日期。FMTQIK 本來就會抓（成交金額用），其中的 ``i`` 欄位正是當日加權股價指數收盤。
+
+    只修首頁報價與天際線的收盤序列；``sym/_TWII.json`` 的 K 線與技術指標不動，因為那些需要
+    完整的開高低收才算得準，而 FMTQIK 只有收盤。
+
+    回傳補上的資訊，或 None 表示 Yahoo 本來就是最新、或沒有官方資料可用。
+    """
+    series = sorted(
+        (r["d"], float(r["i"])) for r in (turnover_hist or [])
+        if r.get("d") and r.get("i") is not None
+    )
+    q = next((x for x in qlist if x["symbol"] == "^TWII"), None)
+    if not series or q is None:
+        return None
+    yahoo_date = q.get("date") or ""
+    extra = [(d, v) for d, v in series if d > yahoo_date]
+    if not extra:
+        return None
+
+    # 天際線的收盤序列：同日覆蓋、新日附加，最後依日期排序
+    dates = list(taiex.get("d") or [])
+    closes = list(taiex.get("c") or [])
+    at = {d: i for i, d in enumerate(dates)}
+    for d, v in extra:
+        if d in at:
+            closes[at[d]] = rnd(v)
+        else:
+            dates.append(d)
+            closes.append(rnd(v))
+    order = sorted(range(len(dates)), key=lambda i: dates[i])
+    taiex["d"] = [dates[i] for i in order]
+    taiex["c"] = [closes[i] for i in order]
+
+    # 首頁報價：最新一筆官方收盤；前一日取官方序列的前一筆，沒有就退回 Yahoo 的最後收盤
+    date, close = extra[-1]
+    earlier = [v for d, v in series if d < date]
+    prev = earlier[-1] if earlier else q.get("price")
+    q["price"] = rnd(close)
+    q["date"] = date
+    q["stale"] = False
+    q["src"] = "twse"
+    if prev:
+        q["chg"] = rnd(close - prev)
+        q["pct"] = round((close / prev - 1) * 100, 2)
+    if q.get("spark"):
+        q["spark"] = (list(q["spark"]) + [rnd(v) for _, v in extra])[-30:]
+    return {"date": date, "close": rnd(close), "days": len(extra), "yahoo_date": yahoo_date}
 
 
 def write_json(path: Path, obj: Any) -> None:
@@ -220,7 +273,14 @@ def build(symbols_path: Path, out_dir: Path, state: PrevState, *, fx: SimpleName
 
     # ── 首頁大盤走勢（^TWII）──
     tw_detail = details.get("^TWII")
-    taiex = {"d": tw_detail["d"], "c": tw_detail["c"]} if tw_detail else (prev.get("taiex") or {"d": [], "c": []})
+    taiex = {"d": list(tw_detail["d"]), "c": list(tw_detail["c"])} if tw_detail else (prev.get("taiex") or {"d": [], "c": []})
+    # Yahoo 的 ^TWII 可能落後幾個交易日：用證交所官方收盤補上，否則首頁會停在舊日期
+    official = apply_official_index(qlist, taiex, turnover_hist)
+    if official:
+        log.info("taiex: yahoo at %s, filled %d day(s) from TWSE up to %s",
+                 official["yahoo_date"] or "—", official["days"], official["date"])
+        sources["twse_index"] = {"ok": True, "at": now_iso, "date": official["date"],
+                                 "note": f"Yahoo 停在 {official['yahoo_date'] or '—'}，改用證交所收盤"}
     twii_q = next((q for q in qlist if q["symbol"] == "^TWII"), None)
 
     index = {

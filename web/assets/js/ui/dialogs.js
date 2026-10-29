@@ -6,6 +6,7 @@ import { D, load } from '../lib/app.js';
 import { act, onInput, onSubmit } from '../lib/actions.js';
 import { SOURCE_LABEL, status as marketStatus } from '../lib/market.js';
 import * as store from '../lib/store.js';
+import * as live from '../lib/live.js';
 import { WORKER_URL, forceUpdate } from '../lib/admin.js';
 import { loadIndex } from '../lib/api.js';
 import * as layers from './layers.js';
@@ -28,11 +29,27 @@ function settingsHtml() {
     ${seg('外觀', 'theme', [['auto', '跟隨系統'], ['dark', '夜間'], ['light', '晨霧']], s.theme)}
     ${seg('漲跌顏色', 'ud', [['tw', '紅漲綠跌'], ['intl', '綠漲紅跌']], s.ud)}
     <div class="row"><label for="set-refresh"><div>自動更新</div><small>開著頁面時每 5 分鐘重新讀取資料</small></label><input type="checkbox" id="set-refresh" data-change="set-refresh" ${s.refresh ? 'checked' : ''}></div>
+    <div class="row"><label for="set-live"><div>盤中即時報價</div><small>交易時段每 15 秒取證交所即時行情，覆蓋加權指數與台股個股的價格</small></label><input type="checkbox" id="set-live" data-change="set-live" ${s.live ? 'checked' : ''}></div>
     <div class="row"><div><div>備份</div><small>自選 ${g.watch.length} 檔、持股 ${g.holdings.length} 筆、警示 ${g.alerts.length} 則，只存在這個瀏覽器</small></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="btn btn--sm" data-act="export">匯出</button><label class="btn btn--sm" for="import-file" style="cursor:pointer">匯入</label><input type="file" id="import-file" accept="application/json,.json" class="sr" data-change="import-file"></div></div>
     <div class="row"><div><div>清除本機資料</div><small>刪除自選、持股、警示與設定</small></div><button type="button" class="btn btn--sm" data-act="clear">${armedClear ? '再按一次確認' : '清除'}</button></div>
     <div class="row"><div><div>快速鍵</div><small><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>K</kbd> 或 <kbd>/</kbd> 搜尋　<kbd>Esc</kbd> 關閉視窗</small></div></div>
     <div class="foot"><button type="button" class="btn btn--lamp" data-act="close-layer">完成</button></div>`;
+}
+
+/** 即時報價那一列：狀態、檔數、最後成功時間或失敗原因。 */
+function liveRow() {
+  const v = live.info();
+  let state = '正常';
+  let note = '';
+  if (!v.configured) { state = '未啟用'; note = '需要先部署 Worker 並填入網址'; }
+  else if (!v.enabled) { state = '已關閉'; note = '可在設定中開啟'; }
+  else if (!v.window) { state = '非交易時段'; note = '平日 08:45–13:40 才會啟動'; }
+  else if (v.error) { state = '失敗，顯示收盤價'; note = v.error; }
+  else if (!v.fresh) { state = '連線中'; }
+  else { note = `${v.count} 檔　${stamp(v.at)}`; }
+  const ok = v.configured && v.enabled && v.window && !v.error;
+  return html`<div class="src"><span class="${ok ? 'flat' : 'up'}" aria-hidden="true">${ok ? '●' : '▲'}</span><span>盤中即時報價（證交所 MIS）${note ? html`<small>　${note}</small>` : ''}</span><small>${state}</small></div>`;
 }
 
 function statusHtml() {
@@ -44,9 +61,10 @@ function statusHtml() {
     <h2>資料狀態</h2>
     <p class="mute" style="margin:0 0 8px">資料日期 ${ix.trade_date}；最後更新 ${stamp(ix.updated_at)}（${ago(ix.updated_at)}）。${st.stale ? ' 資料已過期，可能是排程暫停或來源異常。' : ''}</p>
     ${ix.sample ? html`<p class="banner">目前顯示的是開發用的範例資料，不是真實行情。</p>` : ''}
+    ${liveRow()}
     ${src.map(([k, v]) => html`<div class="src"><span class="${v.ok ? 'flat' : 'up'}" aria-hidden="true">${v.ok ? '●' : '▲'}</span><span>${SOURCE_LABEL[k] || k}${v.got != null ? html`<small>　${v.got}/${v.total} 檔</small>` : ''}${!v.ok && v.error ? html`<small>　${v.error}</small>` : ''}</span><small>${v.ok ? '正常' : '失敗，沿用舊資料'}</small></div>`)}
     ${WORKER_URL ? html`<form class="row" data-submit="force-update" style="gap:8px;flex-wrap:wrap;margin-top:12px"><label for="adm-pw" style="flex:1 1 100%"><div>強制更新（管理員）</div><small>輸入管理密碼後，立即觸發一次資料更新，約 2 分鐘完成</small></label><input id="adm-pw" name="password" type="password" autocomplete="current-password" placeholder="管理密碼" style="flex:1 1 160px" required><button type="submit" class="btn btn--sm" ${forcing ? 'disabled' : ''}>${forcing ? '更新中…' : '強制更新'}</button></form>` : ''}
-    <p class="note" style="margin-top:12px">免費來源可能延遲或暫時失效；失敗的項目會沿用上一次成功的資料並標示「舊資料」。價格並非即時，請以券商報價為準。</p>
+    <p class="note" style="margin-top:12px">免費來源可能延遲或暫時失效；失敗的項目會沿用上一次成功的資料並標示「舊資料」。盤中價格來自證交所即時行情（約 5–15 秒延遲），其餘區塊依排程更新；成交請以券商報價為準。</p>
     <div class="foot"><button type="button" class="btn" data-act="refresh">立即重新讀取</button><button type="button" class="btn btn--lamp" data-act="close-layer">關閉</button></div>`;
 }
 
@@ -85,6 +103,12 @@ export function bind() {
   act('status', () => openDialog('status'));
   act('set', (el) => { store.setSetting(el.dataset.name, el.dataset.v); paint(); });
   onInput('set-refresh', (el) => { store.setSetting('refresh', el.checked); });
+  onInput('set-live', (el) => {
+    store.setSetting('live', el.checked);
+    live.configure({ enabled: el.checked });
+    if (el.checked) live.start(); // 非交易時段是空操作
+    paint();
+  });
   act('export', () => { download(`twstock-backup-${new Date().toISOString().slice(0, 10)}.json`, store.exportJson()); ctx.toast('已匯出備份檔'); });
   onInput('import-file', async (el) => {
     const f = el.files?.[0];

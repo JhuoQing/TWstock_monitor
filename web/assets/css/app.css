@@ -107,6 +107,8 @@ h1, h2, h3, p { margin: 0; }
 .lamp { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
 .is-open .lamp { background: var(--lamp); box-shadow: 0 0 0 0 var(--lamp); animation: pulse 2.2s infinite; }
 .is-warn .lamp { background: var(--up); }
+/* 即時報價中：比盤中更快的脈動 */
+.is-live .lamp { background: var(--lamp); box-shadow: 0 0 0 0 var(--lamp); animation: pulse 1.1s infinite; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } }
 .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; background: none; border: 1px solid transparent; border-radius: 8px; color: var(--mute); }
 .icon-btn:hover { color: var(--ink); border-color: var(--edge); background: var(--surface); }
@@ -150,6 +152,7 @@ select.field { padding-right: 24px; }
 .tag { display: inline-block; padding: 0 8px; border: 1px solid var(--edge); border-radius: 99px; color: var(--mute); font-size: 11.5px; line-height: 18px; white-space: nowrap; }
 .tag--imp { background: var(--lamp); color: var(--lamp-ink); border-color: transparent; font-weight: 700; }
 .tag--stale { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+.tag--live { color: var(--lamp); border-color: color-mix(in srgb, var(--lamp) 45%, transparent); }
 .sig { display: inline-block; padding: 0 8px; border: 1px solid currentColor; border-radius: 6px; font-size: 12px; line-height: 19px; white-space: nowrap; }
 .sig--bull { color: var(--up); }
 .sig--bear { color: var(--down); }
@@ -399,7 +402,7 @@ details.arch .arch__i { padding: 8px 0 12px; border-top: 1px dashed var(--edge);
   .sbar { grid-template-columns: 84px minmax(0, 1fr) 60px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tape__in, .is-open .lamp, .skel, .toast { animation: none; }
+  .tape__in, .is-open .lamp, .is-live .lamp, .skel, .toast { animation: none; }
   .sheet, .scrim, .pal, .dlg { transition: none; }
   html { scroll-behavior: auto; }
 }

@@ -2,8 +2,9 @@
 
 import { html } from '../lib/html.js';
 import { num, pct, cls, ago } from '../lib/fmt.js';
-import { D } from '../lib/app.js';
+import { D, resolve } from '../lib/app.js';
 import { status } from '../lib/market.js';
+import * as live from '../lib/live.js';
 import { link } from './components.js';
 import * as store from '../lib/store.js';
 
@@ -22,15 +23,15 @@ export function applySettings() {
 
 export function paintTape() {
   const el = $('tape');
-  const items = TAPE.map((k) => D.bySymbol.get(k)).filter(Boolean);
+  const items = TAPE.filter((k) => D.bySymbol.has(k)).map((k) => resolve(k));
   if (!items.length) { el.hidden = true; return; }
-  const one = (hidden) => html`<span class="tape__in-copy" ${hidden ? html`aria-hidden="true"` : ''} style="display:inline-flex;gap:34px;padding-right:34px">${items.map((q) => html`<a class="tape__i" href="${link(q.symbol)}" ${hidden ? html`tabindex="-1"` : ''}><b>${q.name}</b><span class="num">${num(q.price, q.price >= 100 ? 2 : 3)}</span><span class="${cls(q.pct)}">${pct(q.pct)}</span></a>`)}</span>`;
+  const one = (hidden) => html`<span class="tape__in-copy" ${hidden ? html`aria-hidden="true"` : ''} style="display:inline-flex;gap:34px;padding-right:34px">${items.map((q) => html`<a class="tape__i" href="${link(q.key)}" ${hidden ? html`tabindex="-1"` : ''}><b>${q.name}</b><span class="num">${num(q.price, q.price >= 100 ? 2 : 3)}</span><span class="${cls(q.pct)}">${pct(q.pct)}</span></a>`)}</span>`;
   el.hidden = false;
   el.innerHTML = String(html`<div class="tape__in">${one(false)}${one(true)}</div>`);
 }
 
 export function paintStatus() {
-  const st = status(D.index);
+  const st = status(D.index, new Date(), live.info());
   const b = $('status');
   b.className = `status ${st.cls}`;
   $('status-t').textContent = D.loading && !D.index ? '載入中' : st.text;
@@ -47,7 +48,8 @@ export function paintNav(view) {
 
 export function paintFooter() {
   $('foot').innerHTML = String(html`
-    <p>資料來源：Yahoo Finance、臺灣證券交易所、證券櫃檯買賣中心、臺灣期貨交易所、Google News／Yahoo 新聞 RSS、美國聖路易聯邦準備銀行 FRED。僅整理公開資訊，非即時報價，可能延遲或有誤。</p>
+    <p>資料來源：Yahoo Finance、臺灣證券交易所、證券櫃檯買賣中心、臺灣期貨交易所、Google News／Yahoo 新聞 RSS、美國聖路易聯邦準備銀行 FRED。僅整理公開資訊，可能延遲或有誤。</p>
+    <p>盤中加權指數與台股個股為證交所即時行情（約 5–15 秒延遲），籌碼、排行與新聞等區塊依排程更新。</p>
     <p>本網站內容不構成投資建議，投資有風險，請自行判斷並以券商報價為準。總體經濟摘要由 AI 產生，其餘內容皆為規則式計算。</p>
     <p>你的自選股、持股與警示只存在這個瀏覽器，不會上傳到任何伺服器。</p>`);
 }

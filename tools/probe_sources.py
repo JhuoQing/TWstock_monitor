@@ -77,7 +77,29 @@ def main() -> int:
         from pipeline.quotes import download_histories
 
         got = download_histories(["^TWII", "2330.TW", "TWD=X"], sleep=0.5)
-        print(f"- 取得 {sorted(got)}；^TWII 最新日 {got['^TWII'].index[-1].date() if '^TWII' in got else '—'}")
+        last = got["^TWII"].index[-1].date() if "^TWII" in got else None
+        print(f"- 取得 {sorted(got)}；^TWII 最新日 {last or '—'}")
+        if last:
+            lag = (dt.datetime.now(twse.TZ).date() - last).days
+            print(f"- 距今 {lag} 天{'（落後，首頁會改用證交所官方收盤）' if lag > 1 else ''}")
+    except Exception as e:  # noqa: BLE001
+        print(f"- ❌ `{type(e).__name__}: {str(e)[:200]}`")
+
+    print("\n### 證交所 MIS（盤中即時行情；網頁是經 Cloudflare Worker 代理讀這個）")
+    try:
+        j = http.get_json(
+            "https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
+            params={"ex_ch": "tse_t00.tw|tse_2330.tw", "json": "1", "delay": "0"},
+            timeout=20,
+            headers={"Referer": "https://mis.twse.com.tw/stock/index.jsp"},
+        )
+        arr = j.get("msgArray") or []
+        print(f"- rtcode `{j.get('rtcode')}` {j.get('rtmessage') or ''}；{len(arr)} 筆")
+        for m in arr:
+            print(f"  - `{m.get('ex')}_{m.get('ch')}` z={m.get('z')} y={m.get('y')} "
+                  f"o={m.get('o')} v={m.get('v')} d={m.get('d')} t={m.get('t')}")
+        if not arr:
+            print(f"- 原始樣本：`{raw_sample(j)}`")
     except Exception as e:  # noqa: BLE001
         print(f"- ❌ `{type(e).__name__}: {str(e)[:200]}`")
 
