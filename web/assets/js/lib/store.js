@@ -5,7 +5,7 @@ const OPS = ['>=', '<='];
 
 const defaults = () => ({
   v: 2,
-  settings: { theme: 'auto', ud: 'tw', refresh: true },
+  settings: { theme: 'auto', ud: 'tw', refresh: true, live: true },
   watch: [],
   alerts: [],
   holdings: [],
@@ -36,6 +36,7 @@ export function normalize(p) {
       theme: ['auto', 'dark', 'light'].includes(st.theme) ? st.theme : d.settings.theme,
       ud: ['tw', 'intl'].includes(st.ud) ? st.ud : d.settings.ud,
       refresh: st.refresh !== false,
+      live: st.live !== false,
     },
     watch: Array.isArray(s.watch) ? [...new Set(s.watch.filter((x) => typeof x === 'string' && x))].slice(0, 200) : [],
     alerts: Array.isArray(s.alerts) ? s.alerts.filter(validAlert).slice(0, 100).map((a) => ({ id: a.id, sym: a.sym, op: a.op, value: a.value, on: a.on !== false, at: a.at || null, note: String(a.note || '').slice(0, 40) })) : [],

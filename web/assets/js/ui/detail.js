@@ -43,7 +43,7 @@ function paintHead() {
       <div class="dt__sub">${r.group || ''}　${r.code}${r.stale ? ' · 舊資料' : ''}${r.tracked ? '' : ' · 僅當日報價'}</div>
       <h2 class="dt__title" id="dt-title">${r.name}</h2>
     </div>
-    <div class="dt__px"><span class="dt__price ${cls(r.pct)}">${price(r.price)}</span><span class="${cls(r.pct)} num" style="font-size:20px">${signed(r.chg, 2)}　${pct(r.pct)}</span>${r.quote?.date ? html`<small>${dateShort(r.quote.date)}</small>` : ''}</div>
+    <div class="dt__px"><span class="dt__price ${cls(r.pct)}">${price(r.price)}</span><span class="${cls(r.pct)} num" style="font-size:20px">${signed(r.chg, 2)}　${pct(r.pct)}</span>${r.live ? html`<small><span class="tag tag--live">即時</span> ${r.liveAt || ''}</small>` : r.quote?.date ? html`<small>${dateShort(r.quote.date)}</small>` : ''}</div>
     <div class="dt__act">
       <button type="button" class="btn" data-act="dt-watch" aria-pressed="${String(wl)}">${wl ? '已在自選' : '加入自選'}</button>
       <button type="button" class="btn" data-act="dt-share">分享連結</button>

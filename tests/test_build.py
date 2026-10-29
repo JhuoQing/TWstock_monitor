@@ -155,6 +155,53 @@ def test_alerts_sent_through_fx(tmp_path, symbols_file):
     assert idx  # 不影響主要輸出
 
 
+def test_apply_official_index_fills_lagging_yahoo():
+    q = {"symbol": "^TWII", "name": "加權指數", "price": 100.0, "date": "2026-10-20",
+         "chg": 1.0, "pct": 1.0, "spark": [98.0, 99.0, 100.0], "stale": True}
+    taiex = {"d": ["2026-10-19", "2026-10-20"], "c": [99.0, 100.0]}
+    hist = [{"d": "2026-10-20", "v": 3000.0, "i": 100.0}, {"d": "2026-10-21", "v": 3100.0, "i": 110.0}]
+
+    got = B.apply_official_index([q], taiex, hist)
+    assert got == {"date": "2026-10-21", "close": 110.0, "days": 1, "yahoo_date": "2026-10-20"}
+    assert q["price"] == 110.0 and q["date"] == "2026-10-21" and q["src"] == "twse"
+    assert q["chg"] == 10.0 and q["pct"] == 10.0 and q["stale"] is False
+    assert q["spark"][-1] == 110.0
+    assert taiex["d"][-1] == "2026-10-21" and taiex["c"][-1] == 110.0
+
+    # 已經是最新、或沒有官方資料 → 不動任何東西
+    assert B.apply_official_index([q], taiex, hist) is None
+    assert B.apply_official_index([q], taiex, []) is None
+    assert B.apply_official_index([q], taiex, [{"d": "2026-10-22", "v": 1.0, "i": None}]) is None
+
+
+def test_apply_official_index_overwrites_same_day_and_sorts():
+    q = {"symbol": "^TWII", "price": 100.0, "date": "2026-10-19", "spark": [100.0]}
+    taiex = {"d": ["2026-10-19", "2026-10-20"], "c": [99.0, 100.0]}
+    hist = [{"d": "2026-10-20", "i": 101.5}, {"d": "2026-10-21", "i": 102.0}]
+    B.apply_official_index([q], taiex, hist)
+    assert taiex["d"] == ["2026-10-19", "2026-10-20", "2026-10-21"]
+    assert taiex["c"] == [99.0, 101.5, 102.0]  # 同日以官方收盤覆蓋
+
+
+def test_lagging_yahoo_index_is_filled_in_full_build(tmp_path, symbols_file):
+    """Yahoo 的 ^TWII 落後幾個交易日時，首頁報價與天際線改用證交所官方收盤。"""
+    def lagging(syms):
+        return {s: fx.make_df(start=50 + i * 100, seed=i + 1, **({"end": "2026-10-22"} if s == "^TWII" else {}))
+                for i, s in enumerate(syms)}
+
+    out = tmp_path / "o"
+    idx = run(symbols_file, out, fx_=make_fx(histories=lagging))
+    q = next(x for x in idx["quotes"] if x["symbol"] == "^TWII")
+    assert q["date"] == "2026-10-27" and q["price"] == 46500.0 and q["src"] == "twse"
+    assert q["chg"] == 500.0 and q["pct"] == 1.09  # 以官方前一日 46000 為基準
+    assert idx["trade_date"] == "2026-10-27"
+    assert idx["taiex"]["d"][-1] == "2026-10-27" and idx["taiex"]["c"][-1] == 46500.0
+    assert idx["sources"]["twse_index"]["ok"]
+    # K 線詳情維持 Yahoo 原資料：官方只有收盤，不能憑空補開高低
+    det = json.loads((out / "sym/_TWII.json").read_text())
+    assert det["d"][-1] == "2026-10-22"
+
+
 def test_validate_index_rules():
     good = {"schema": 2, "updated_at": "x", "sources": {}, "taiex": {"d": ["a"] * 40, "c": [1] * 40},
             "quotes": [{"symbol": "^TWII", "price": 1, "pct": 0, "spark": []}]}

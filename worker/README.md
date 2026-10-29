@@ -1,7 +1,17 @@
-# 強制更新 Worker 部署教學
+# Worker 部署教學
 
-網頁輸入管理密碼 → Cloudflare Worker 驗證 → 呼叫 GitHub `workflow_dispatch` → `update-data` 立即執行。
+這個 Worker 做兩件事：
+
+| 路徑 | 用途 | 要不要密碼 |
+| --- | --- | --- |
+| `POST /` | 強制更新：驗證管理密碼 → 呼叫 GitHub `workflow_dispatch` → `update-data` 立即執行 | 要 |
+| `GET /live` | 盤中即時行情：代理證交所 MIS，網頁每 15 秒讀一次 | 不用（唯讀公開資料） |
+
 密碼與 GitHub token 都只存在 Worker 的 secret，不會出現在網頁或 repo。
+
+> **已經部署過舊版的話**：`/live` 是後來加的，要再跑一次 `npx wrangler deploy` 才會生效，
+> 否則網頁的「資料狀態」會顯示「Worker 還沒有 /live，請重新部署」。
+> 不需要重設 secret，也不用動 GitHub token。
 
 ## 1. 建立 GitHub fine-grained token
 1. GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token
@@ -33,8 +43,24 @@ curl -i -X POST https://twstock-admin.<子網域>.workers.dev \
 ```
 再到網頁輸入正確密碼，Actions 頁面應出現一筆 `workflow_dispatch` 的 update-data，約 2 分鐘後頁面自動更新。
 
+即時行情（盤中測試才會有成交價）：
+```bash
+curl -s "https://twstock-admin.<子網域>.workers.dev/live?ch=tse_t00.tw|tse_2330.tw" | head -c 400
+# {"ok":true,"at":"…","delay":5000,"q":[{"ch":"tse_t00.tw","price":27543.21,"prev":27499,"chg":44.21,…}]}
+```
+`?raw=1` 會回 MIS 的原始 JSON，欄位對不上時用它來看實際形狀。
+
+## 即時行情說明
+- 頻道格式 `tse_2330.tw`（上市）、`otc_6488.tw`（上櫃）、`tse_t00.tw`（加權指數）、`otc_o00.tw`（櫃買指數），
+  一次最多 40 個，不符格式的會被丟掉。
+- 相同的標的組合有 **10 秒邊緣快取**，所以多開分頁或多人看，對 MIS 的請求不會等比增加。
+- MIS 偶爾會改欄位或擋請求。解析壞掉時網頁會退回收盤價並在「資料狀態」顯示原因；
+  要查實際回應，用上面的 `?raw=1`，或在 GitHub 跑 **Actions → probe-sources**。
+- Cloudflare 從哪個機房出去不固定。萬一 MIS 擋掉該區域的請求，`/live` 會回 502，網頁照樣退回收盤價。
+
 ## 防護說明
-- 只接受來自 `ALLOWED_ORIGIN` 的請求。
+- 只接受來自 `ALLOWED_ORIGIN` 的請求（可用逗號分隔多個，例如再加 `http://localhost:8000` 方便本機開發）。
+  `/live` 若沒有 `Origin` 標頭（curl）會放行，因為它只是唯讀的公開行情。
 - 同一 IP 每 3 秒只能嘗試一次密碼；密碼比對為常數時間。
 - 驗證通過後，全站 `COOLDOWN_SECONDS`（預設 300 秒）內只會觸發一次。
 - token 只有這個 repo 的 Actions 權限，外洩時最壞狀況是有人能觸發或取消這個 repo 的 workflow。

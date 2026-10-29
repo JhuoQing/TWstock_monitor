@@ -30,18 +30,21 @@ export function freshness(updatedAt, now = new Date()) {
   return { mins, level: mins > limit ? 'stale' : mins > limit / 2 && open ? 'late' : 'fresh' };
 }
 
-/** 頁首狀態燈。 */
-export function status(index, now = new Date()) {
+/** 頁首狀態燈。liveInfo 來自 lib/live.js 的 info()，有即時報價時優先顯示「即時」。 */
+export function status(index, now = new Date(), liveInfo = null) {
   const s = session(now);
   if (!index) return { cls: '', text: '載入中', detail: '' };
   const f = freshness(index.updated_at, now);
-  const stale = f.level === 'stale';
+  const live = !!(liveInfo && liveInfo.fresh && liveInfo.count > 0);
+  // 有即時報價時，排程資料過期就不是重點了（價格是新的，只有籌碼等區塊比較舊）
+  const stale = f.level === 'stale' && !live;
   const dataOpen = s === 'open' && !stale;
   return {
-    cls: stale ? 'is-warn' : dataOpen ? 'is-open' : '',
-    text: stale ? '資料過期' : SESSION_LABEL[s],
+    cls: live ? 'is-live' : stale ? 'is-warn' : dataOpen ? 'is-open' : '',
+    text: live ? '即時' : stale ? '資料過期' : SESSION_LABEL[s],
     session: s,
     stale,
+    live,
     mins: f.mins,
   };
 }
@@ -60,6 +63,7 @@ export const SOURCE_LABEL = {
   twse_t86: '證交所 · 個股法人買賣超',
   twse_margin: '證交所 · 融資融券',
   twse_turnover: '證交所 · 成交金額',
+  twse_index: '證交所 · 加權指數收盤（補 Yahoo 落後）',
   taifex_oi: '期交所 · 外資期貨未平倉',
   twse_dividends: '證交所 · 除權息預告',
   twse_notices: '證交所 · 注意／處置股',

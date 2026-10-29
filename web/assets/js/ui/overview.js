@@ -70,8 +70,18 @@ function macroLine(m) {
   return html`<a class="qrow qrow--simple" href="${href({ view: 'macro' })}"><span class="qrow__nm">${m.name}</span><span class="qrow__px num">${num(m.value, 2)}${m.unit === '%' ? '%' : ''}</span><span class="${cls(d)} qrow__px">${d == null ? '' : signed(d, 2)}</span></a>`;
 }
 
+/** hero 價格底下那行小字：即時報價顯示時間，否則顯示資料日期。 */
+function heroStamp(t) {
+  if (t.live) return html`<span class="tag tag--live">即時</span> ${t.liveAt || ''}`;
+  return html`${dateShort(t.date)} ${t.stale ? '（舊資料）' : ''}`;
+}
+
+const heroChg = (t) => html`${signed(t.chg, 2)} <span>${pct(t.pct)}</span><small>${heroStamp(t)}</small>`;
+
+const miniRow = (r) => html`<a href="${link(r.key)}"><span class="n">${r.name}</span><span class="v num">${price(r.price)}<span class="${cls(r.pct)}">${pct(r.pct)}</span></span></a>`;
+
 export function render(ix) {
-  const t = D.bySymbol.get('^TWII');
+  const t = resolve('^TWII');
   const focus = D.quotes.filter((q) => q.focus && (q.kind === 'stock' || q.kind === 'etf')).map((q) => resolve(q.symbol));
   const groups = scan(D.quotes).slice(0, 5);
   const s = ix.institutional?.summary;
@@ -88,12 +98,12 @@ export function render(ix) {
         <div class="hero__main">
           <div class="hero__lbl">加權指數</div>
           ${t ? html`
-            <a class="hero__num" href="${link('^TWII')}" aria-label="加權指數 ${num(t.price, 2)}，查看走勢圖">${num(t.price, 2)}</a>
-            <div class="hero__chg ${cls(t.pct)}">${signed(t.chg, 2)} <span>${pct(t.pct)}</span><small>${dateShort(t.date)} ${t.stale ? '（舊資料）' : ''}</small></div>
+            <a class="hero__num" id="hero-px" href="${link('^TWII')}" aria-label="加權指數 ${num(t.price, 2)}，查看走勢圖">${num(t.price, 2)}</a>
+            <div class="hero__chg ${cls(t.pct)}" id="hero-chg">${heroChg(t)}</div>
             <p class="hero__mood">${mood(ix)}</p>`
           : empty('暫時沒有加權指數資料', '資料更新後會自動出現。')}
-          <div class="hero__mini">
-            ${MINI.map((k) => D.bySymbol.get(k)).filter(Boolean).map((q) => html`<a href="${link(q.symbol)}"><span class="n">${q.name}</span><span class="v num">${price(q.price)}<span class="${cls(q.pct)}">${pct(q.pct)}</span></span></a>`)}
+          <div class="hero__mini" id="hero-mini">
+            ${MINI.filter((k) => D.bySymbol.has(k)).map((k) => miniRow(resolve(k)))}
           </div>
         </div>
         <div class="hero__chart-wrap">
@@ -112,7 +122,7 @@ export function render(ix) {
       <div>
         <section>
           ${head('焦點個股', '點選看技術圖', html`<a class="link" href="${href({ view: 'mine' })}">管理自選</a>`)}
-          ${focus.length ? focus.map((r) => quoteRow(r)) : empty('尚無個股資料')}
+          <div id="focus-list">${focus.length ? focus.map((r) => quoteRow(r)) : empty('尚無個股資料')}</div>
         </section>
 
         <section class="sec">
@@ -157,25 +167,64 @@ export function render(ix) {
 
 let chart = null;
 let introPlayed = false; // 天際線的進場動畫每次載入頁面只播一次
+let baseX = null; // 排程產出的收盤序列，盤中用它加上今天那一棟
+let baseC = null;
+
+/** 把最新報價接到收盤序列後面：已經有今天就改寫樓高，還沒有就蓋一棟新的。 */
+function skylineModel(t) {
+  const x = [...baseX];
+  const c = [...baseC];
+  if (t && Number.isFinite(t.price) && t.date) {
+    if (t.date > x.at(-1)) {
+      x.push(t.date);
+      c.push(t.price);
+    } else if (t.date === x.at(-1)) {
+      c[c.length - 1] = t.price;
+    }
+  }
+  return { x, panes: [{ id: 'sky', padTop: 0.34, padBottom: 0.04, series: [{ kind: 'skyline', c, dir: Math.sign(t?.pct ?? 0) }] }] };
+}
 
 /** 建立天際線。回傳清理函式。 */
 export function mount(root, ix) {
   const host = root.querySelector('#hero-chart');
   if (!host || !ix.taiex?.c?.length) return () => {};
-  const t = D.bySymbol.get('^TWII');
-  const x = [...ix.taiex.d];
-  const c = [...ix.taiex.c];
-  if (t && t.date > x.at(-1)) {
-    x.push(t.date);
-    c.push(t.price);
-  }
+  baseX = [...ix.taiex.d];
+  baseC = [...ix.taiex.c];
   chart = new TimeChart(host, { intro: introPlayed ? 0 : 1100, wheelZoom: 'modifier', label: '加權指數天際線：每個交易日一棟大樓，樓高為收盤指數', axisW: 62 });
-  chart.setModel({ x, panes: [{ id: 'sky', padTop: 0.34, padBottom: 0.04, series: [{ kind: 'skyline', c, dir: Math.sign(t?.pct ?? 0) }] }] }, { count: 120 });
+  chart.setModel(skylineModel(resolve('^TWII')), { count: 120 });
   introPlayed = true;
   return () => {
     chart?.destroy();
     chart = null;
+    baseX = baseC = null;
   };
+}
+
+/** 即時報價進來時只更新 hero 與天際線末柱，不重建整頁（避免捲動與焦點被打斷）。 */
+export function paintLive(root) {
+  const t = resolve('^TWII');
+  if (!t) return;
+  const px = root.querySelector('#hero-px');
+  if (px) {
+    px.textContent = num(t.price, 2);
+    px.setAttribute('aria-label', `加權指數 ${num(t.price, 2)}，查看走勢圖`);
+  }
+  const chg = root.querySelector('#hero-chg');
+  if (chg) {
+    chg.className = `hero__chg ${cls(t.pct)}`;
+    chg.innerHTML = String(heroChg(t));
+  }
+  const mini = root.querySelector('#hero-mini');
+  if (mini) mini.innerHTML = String(html`${MINI.filter((k) => D.bySymbol.has(k)).map((k) => miniRow(resolve(k)))}`);
+  // 焦點個股也是台股，跑馬燈動了這裡就不能停在收盤價
+  const list = root.querySelector('#focus-list');
+  if (list) {
+    const focus = D.quotes.filter((q) => q.focus && (q.kind === 'stock' || q.kind === 'etf')).map((q) => resolve(q.symbol));
+    if (focus.length) list.innerHTML = String(html`${focus.map((r) => quoteRow(r))}`);
+  }
+  // 使用者正在看十字線時不要重畫，否則游標資訊會被清掉
+  if (chart && baseX && !chart.hover) chart.setModel(skylineModel(t));
 }
 
 export function setRange(n) {

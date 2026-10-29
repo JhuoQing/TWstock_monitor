@@ -1,7 +1,8 @@
 // 進入點：載入資料、路由、各頁面渲染、浮層與自動更新。
 
 import { html } from './lib/html.js';
-import { D, load, priceOf, resolve, startAutoRefresh, subscribe as onData } from './lib/app.js';
+import { D, load, priceOf, resolve, startAutoRefresh, subscribe as onData, syncLiveTargets } from './lib/app.js';
+import * as live from './lib/live.js';
 import * as store from './lib/store.js';
 import * as router from './lib/router.js';
 import { install as installActions, act } from './lib/actions.js';
@@ -109,11 +110,26 @@ function checkAlerts() {
   }
 }
 
+const typingInView = () => view.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+
 function afterLoad() {
   chrome();
   if (!D.index) return renderView();
-  const typing = view.contains(document.activeElement) && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
-  if (!typing) renderView();
+  if (!typingInView()) renderView();
+  detail.repaint();
+  live.start();
+  checkAlerts();
+}
+
+/** 即時報價進來：只更新有價格的地方，不重建整頁（每 15 秒重畫會打斷閱讀與輸入）。 */
+function onLive() {
+  shell.paintStatus();
+  shell.paintTape();
+  if (D.index) {
+    if (base.view === 'overview') overview.paintLive(view);
+    // 自選頁整頁都是報價，直接重畫；使用者正在輸入時先跳過，下一輪再更新
+    else if (base.view === 'mine' && !typingInView()) renderView();
+  }
   detail.repaint();
   checkAlerts();
 }
@@ -149,29 +165,38 @@ act('hero-range', (el) => {
 
 store.subscribe(() => {
   shell.applySettings();
+  // 自選股變動會改變要追的即時標的
+  if (syncLiveTargets()) live.start();
   // 自選股／警示變動時，目前頁面可能需要更新（個股視窗另行局部更新）
   if (base.view === 'mine') renderView();
 });
 
 onData(() => shell.paintStatus());
+live.subscribe(onLive);
 
 shell.applySettings();
 matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', () => shell.applySettings());
 shell.paintFooter();
 window.addEventListener('hashchange', onRoute);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && Date.now() - D.loadedAt > 5 * 60000 && store.settings().refresh) refresh();
+  if (document.hidden) return;
+  if (Date.now() - D.loadedAt > 5 * 60000 && store.settings().refresh) refresh();
+  live.start(); // 回到前景立刻補抓一次（背景時不輪詢）
 });
 setInterval(shell.paintStatus, 60000);
+// 盤前開著頁面時，到了開盤時間要自己啟動
+setInterval(() => live.start(), 60000);
 
 (async () => {
   const r = router.parse(location.hash);
   if (!r.sym) base = r;
+  live.configure({ enabled: store.settings().live });
   await load();
   chrome();
   renderView();
   if (r.sym) onRoute();
   startAutoRefresh(afterLoad);
+  live.start();
   checkAlerts();
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

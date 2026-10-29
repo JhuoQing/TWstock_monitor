@@ -3,6 +3,7 @@
 
 import * as api from './api.js';
 import * as store from './store.js';
+import * as live from './live.js';
 
 const CODE_RE = /^(\d{4,6}[A-Z]?)\.(TW|TWO)$/;
 
@@ -37,6 +38,7 @@ export function ingest(index, universe) {
   }
   D.loadedAt = Date.now();
   D.error = null;
+  syncLiveTargets();
 }
 
 export async function load() {
@@ -56,18 +58,40 @@ export async function load() {
 
 const UNI_KIND = { s: 'stock', e: 'etf', o: 'otc' };
 
-/** 統一的標的資料。找不到回傳 null。 */
+/** 統一的標的資料。找不到回傳 null。
+ *
+ * 盤中若 live 層有這檔的即時報價，price／chg／pct 會以即時值覆蓋，並帶上 live 與 liveAt；
+ * date 一律是靜態資料的交易日（即時覆蓋時交易日就是今天）。
+ */
 export function resolve(key) {
   const q = D.bySymbol.get(key) || (D.byCode.has(key) ? D.bySymbol.get(D.byCode.get(key)) : null);
   if (q) {
     const m = CODE_RE.exec(q.symbol);
-    return { key: q.symbol, symbol: q.symbol, code: m ? m[1] : q.symbol, name: q.name, price: q.price, chg: q.chg, pct: q.pct, kind: q.kind, group: q.group, tracked: true, quote: q, stale: q.stale };
+    const lv = live.get(q.symbol);
+    return {
+      key: q.symbol, symbol: q.symbol, code: m ? m[1] : q.symbol, name: q.name,
+      price: lv ? lv.price : q.price,
+      chg: lv ? lv.chg : q.chg,
+      pct: lv ? lv.pct : q.pct,
+      kind: q.kind, group: q.group, tracked: true, quote: q,
+      date: (lv && live.isoDate(lv)) || q.date, // 價格所屬的交易日：即時時就是今天
+      stale: q.stale && !lv, live: !!lv, liveAt: lv?.t || null,
+    };
   }
   const u = D.uni.get(key);
   if (u) {
     const [code, name, close, pct, value, t] = u;
+    const kind = UNI_KIND[t] || 'stock';
+    const lv = live.get(code);
     const chg = close != null && pct != null ? close - close / (1 + pct / 100) : null;
-    return { key: code, symbol: null, code, name, price: close, chg, pct, value, kind: UNI_KIND[t] || 'stock', group: '台股', tracked: false, quote: null };
+    return {
+      key: code, symbol: null, code, name,
+      price: lv ? lv.price : close,
+      chg: lv ? lv.chg : chg,
+      pct: lv ? lv.pct : pct,
+      value, kind, group: '台股', tracked: false, quote: null,
+      live: !!lv, liveAt: lv?.t || null,
+    };
   }
   return null;
 }
@@ -118,6 +142,32 @@ export function search(query, limit = 14) {
 
 /** 自選股／警示用：把 key 轉成可顯示的資料列，找不到的也保留（資料可能暫時缺漏）。 */
 export const rows = (keys) => keys.map((k) => resolve(k) || { key: k, code: k, name: k, price: null, pct: null, missing: true });
+
+// ── 即時報價（盤中覆蓋靜態資料） ──
+export { live };
+
+/** 依目前資料與使用者的自選／持股，決定要追哪些標的的即時報價（上限見 live.js）。 */
+export function syncLiveTargets() {
+  const keys = [];
+  const add = (k) => { if (k && !keys.includes(k)) keys.push(k); };
+  // 順序就是優先序：指數 → 焦點 → 自選 → 持股 → 其餘追蹤標的
+  add('^TWII');
+  add('^TWOII');
+  for (const q of D.quotes) if (q.focus) add(q.symbol);
+  const g = store.get();
+  for (const k of g.watch) add(k);
+  for (const h of g.holdings) add(h.sym);
+  for (const q of D.quotes) add(q.symbol);
+
+  const out = [];
+  for (const k of keys) {
+    const q = D.bySymbol.get(k) || (D.byCode.has(k) ? D.bySymbol.get(D.byCode.get(k)) : null);
+    const kind = q?.kind ?? UNI_KIND[D.uni.get(k)?.[5]];
+    const ch = live.misChannel(q?.symbol ?? k, kind);
+    if (ch) out.push({ key: q?.symbol ?? k, ch });
+  }
+  return live.setTargets(out);
+}
 
 // ── 自動更新 ──
 let timer = null;

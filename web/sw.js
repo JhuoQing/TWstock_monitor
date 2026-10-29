@@ -1,6 +1,6 @@
 // Service worker：讓網站可安裝、離線時仍能看到上一次的畫面。
 // 資料（data/）一律先走網路、失敗才用快取；程式與樣式採 stale-while-revalidate。
-const VERSION = 'twm-v2-1';
+const VERSION = 'twm-v2-2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon.svg', 'assets/css/app.css', 'assets/js/boot.js', 'assets/js/main.js'];
 
 self.addEventListener('install', (e) => {
