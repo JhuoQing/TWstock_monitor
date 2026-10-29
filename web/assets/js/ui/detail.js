@@ -4,6 +4,7 @@
 import { html } from '../lib/html.js';
 import { num, int, pct, signed, cls, price, compact, dateShort, secs } from '../lib/fmt.js';
 import { D, resolve, yahooSymbol } from '../lib/app.js';
+import { sourceOf } from '../lib/live.js';
 import { act, onSubmit } from '../lib/actions.js';
 import * as api from '../lib/api.js';
 import * as store from '../lib/store.js';
@@ -43,7 +44,7 @@ function paintHead() {
       <div class="dt__sub">${r.group || ''}　${r.code}${r.stale ? ' · 舊資料' : ''}${r.tracked ? '' : ' · 僅當日報價'}</div>
       <h2 class="dt__title" id="dt-title">${r.name}</h2>
     </div>
-    <div class="dt__px"><span class="dt__price ${cls(r.pct)}">${price(r.price)}</span><span class="${cls(r.pct)} num" style="font-size:20px">${signed(r.chg, 2)}　${pct(r.pct)}</span>${r.live ? html`<small><span class="tag tag--live" title="證交所即時行情，每 15 秒更新一次">即時</span> ${r.liveAt || ''}${r.liveDelay == null ? '' : html` · 延遲 ${secs(r.liveDelay)}`}</small>` : r.quote?.date ? html`<small>${dateShort(r.quote.date)}</small>` : ''}</div>
+    <div class="dt__px"><span class="dt__price ${cls(r.pct)}">${price(r.price)}</span><span class="${cls(r.pct)} num" style="font-size:20px">${signed(r.chg, 2)}　${pct(r.pct)}</span>${r.live ? html`<small><span class="tag tag--live" title="${sourceOf(r.liveSrc).title}">${sourceOf(r.liveSrc).label}</span> ${r.liveAt || ''}${r.liveDelay == null ? '' : html` · 延遲 ${secs(r.liveDelay)}`}</small>` : r.quote?.date ? html`<small>${dateShort(r.quote.date)}</small>` : ''}</div>
     <div class="dt__act">
       <button type="button" class="btn" data-act="dt-watch" aria-pressed="${String(wl)}">${wl ? '已在自選' : '加入自選'}</button>
       <button type="button" class="btn" data-act="dt-share">分享連結</button>

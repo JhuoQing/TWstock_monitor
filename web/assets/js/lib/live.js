@@ -17,6 +17,13 @@ const TIMEOUT_MS = 8000;
 
 const CODE_RE = /^(\d{4,6}[A-Z]?)(?:\.(TW|TWO))?$/;
 
+/** 報價來源。Worker 先試證交所 MIS，連不上才退到 Yahoo，兩者延遲差很多，要讓使用者看得出來。 */
+export const SOURCE = {
+  mis: { label: '即時', full: '證交所 MIS', title: '證交所即時行情，每 15 秒更新一次' },
+  yahoo: { label: 'Yahoo', full: 'Yahoo Finance', title: 'Yahoo Finance 盤中報價，約延遲 15–20 分鐘。證交所即時行情連不上時的後備來源' },
+};
+export const sourceOf = (src) => SOURCE[src] || SOURCE.mis;
+
 /** 標的 key →  MIS 頻道。kind 用來判斷沒有後綴的代號是上市還是上櫃。回傳 null 表示不支援（美股、匯率、期貨等）。 */
 export function misChannel(key, kind) {
   if (key === '^TWII') return 'tse_t00.tw';
@@ -80,7 +87,8 @@ let timer = null;
 let fails = 0;
 let lastAt = 0;
 let lastError = null;
-let misDelay = null; // MIS 自己宣告的延遲（毫秒）
+let misDelay = null; // 來源自己宣告的延遲（毫秒）
+let lastSrc = null; // 'mis' 或 'yahoo'
 let enabled = true;
 let running = false;
 
@@ -106,6 +114,7 @@ export function info(now = Date.now()) {
     at: lastAt || null,
     count: fresh ? [...byKey.keys()].filter((k) => get(k, now)).length : 0,
     error: lastError,
+    src: fresh ? lastSrc : null,
     misDelay,
     // 以加權指數為準的實際延遲，給「資料狀態」顯示
     delay: fresh ? delaySec(byKey.get('^TWII') || byKey.values().next().value, now) : null,
@@ -171,10 +180,12 @@ export async function tick(fetchFn = fetch) {
     const j = await fetchOnce(fetchFn);
     // MIS 回傳的頻道大小寫不一定跟送出的一致，比對時一律轉小寫
     const toKey = new Map(targets.map((t) => [t.ch.toLowerCase(), t.key]));
+    const src = j.src === 'yahoo' ? 'yahoo' : 'mis';
     for (const e of j.q || []) {
       const key = toKey.get(String(e?.ch || '').toLowerCase());
-      if (key) byKey.set(key, e);
+      if (key) byKey.set(key, { ...e, src });
     }
+    lastSrc = src;
     lastAt = Date.now();
     lastError = null;
     misDelay = Number.isFinite(j.delay) ? j.delay : null;
@@ -248,5 +259,6 @@ export function reset() {
   lastAt = 0;
   lastError = null;
   misDelay = null;
+  lastSrc = null;
   enabled = true;
 }

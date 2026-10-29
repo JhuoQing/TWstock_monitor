@@ -75,7 +75,7 @@ export function resolve(key) {
       pct: lv ? lv.pct : q.pct,
       kind: q.kind, group: q.group, tracked: true, quote: q,
       date: (lv && live.isoDate(lv)) || q.date, // 價格所屬的交易日：即時時就是今天
-      stale: q.stale && !lv, live: !!lv, liveAt: lv?.t || null, liveDelay: lv ? live.delaySec(lv) : null,
+      stale: q.stale && !lv, live: !!lv, liveAt: lv?.t || null, liveDelay: lv ? live.delaySec(lv) : null, liveSrc: lv?.src || null,
     };
   }
   const u = D.uni.get(key);
@@ -90,7 +90,7 @@ export function resolve(key) {
       chg: lv ? lv.chg : chg,
       pct: lv ? lv.pct : pct,
       value, kind, group: '台股', tracked: false, quote: null,
-      live: !!lv, liveAt: lv?.t || null, liveDelay: lv ? live.delaySec(lv) : null,
+      live: !!lv, liveAt: lv?.t || null, liveDelay: lv ? live.delaySec(lv) : null, liveSrc: lv?.src || null,
     };
   }
   return null;

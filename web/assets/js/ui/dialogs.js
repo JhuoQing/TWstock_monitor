@@ -48,14 +48,17 @@ function liveRow() {
   else if (v.error) { state = '失敗，顯示收盤價'; note = v.error; }
   else if (!v.fresh) { state = '連線中'; }
   else {
+    if (v.src === 'yahoo') state = '後備來源';
     const parts = [`${v.count} 檔`];
     if (v.delay != null) parts.push(`延遲 ${secs(v.delay)}`);
-    if (v.misDelay) parts.push(`證交所宣告 ${secs(v.misDelay / 1000)}`);
+    if (v.misDelay) parts.push(`來源宣告 ${secs(v.misDelay / 1000)}`);
     parts.push(`每 15 秒更新　${stamp(v.at)}`);
     note = parts.join('　');
   }
   const ok = v.configured && v.enabled && v.window && !v.error;
-  return html`<div class="src"><span class="${ok ? 'flat' : 'up'}" aria-hidden="true">${ok ? '●' : '▲'}</span><span>盤中即時報價（證交所 MIS）${note ? html`<small>　${note}</small>` : ''}</span><small>${state}</small></div>`;
+  const name = v.src ? live.sourceOf(v.src).full : '證交所 MIS';
+  const sub = v.src === 'yahoo' ? '　證交所即時行情連不上' : '';
+  return html`<div class="src"><span class="${ok ? 'flat' : 'up'}" aria-hidden="true">${ok ? '●' : '▲'}</span><span>盤中報價（${name}）${note ? html`<small>　${note}${sub}</small>` : ''}</span><small>${state}</small></div>`;
 }
 
 function statusHtml() {

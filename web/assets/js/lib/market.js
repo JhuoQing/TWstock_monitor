@@ -36,12 +36,14 @@ export function status(index, now = new Date(), liveInfo = null) {
   if (!index) return { cls: '', text: '載入中', detail: '' };
   const f = freshness(index.updated_at, now);
   const live = !!(liveInfo && liveInfo.fresh && liveInfo.count > 0);
-  // 有即時報價時，排程資料過期就不是重點了（價格是新的，只有籌碼等區塊比較舊）
+  // 退到 Yahoo 時延遲 15–20 分鐘，不能掛「即時」的燈
+  const realtime = live && liveInfo.src !== 'yahoo';
+  // 有盤中報價時，排程資料過期就不是重點了（價格是新的，只有籌碼等區塊比較舊）
   const stale = f.level === 'stale' && !live;
   const dataOpen = s === 'open' && !stale;
   return {
     cls: live ? 'is-live' : stale ? 'is-warn' : dataOpen ? 'is-open' : '',
-    text: live ? '即時' : stale ? '資料過期' : SESSION_LABEL[s],
+    text: realtime ? '即時' : live ? '盤中延遲' : stale ? '資料過期' : SESSION_LABEL[s],
     session: s,
     stale,
     live,
