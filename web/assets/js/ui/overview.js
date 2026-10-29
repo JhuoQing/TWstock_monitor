@@ -1,7 +1,7 @@
 // 總覽：天際線 hero、資訊帶、焦點個股、法人、訊號掃描，以及右側的新聞／總經／國際行情。
 
 import { html } from '../lib/html.js';
-import { num, int, pct, signed, cls, price, yi, dateShort } from '../lib/fmt.js';
+import { num, int, pct, signed, cls, price, yi, dateShort, secs } from '../lib/fmt.js';
 import { D, resolve, rows } from '../lib/app.js';
 import { scan } from '../lib/signals.js';
 import { href } from '../lib/router.js';
@@ -70,9 +70,11 @@ function macroLine(m) {
   return html`<a class="qrow qrow--simple" href="${href({ view: 'macro' })}"><span class="qrow__nm">${m.name}</span><span class="qrow__px num">${num(m.value, 2)}${m.unit === '%' ? '%' : ''}</span><span class="${cls(d)} qrow__px">${d == null ? '' : signed(d, 2)}</span></a>`;
 }
 
-/** hero 價格底下那行小字：即時報價顯示時間，否則顯示資料日期。 */
+/** hero 價格底下那行小字：即時報價顯示成交時間與延遲，否則顯示資料日期。 */
 function heroStamp(t) {
-  if (t.live) return html`<span class="tag tag--live">即時</span> ${t.liveAt || ''}`;
+  if (t.live) {
+    return html`<span class="tag tag--live" title="證交所即時行情，每 15 秒更新一次">即時</span> ${t.liveAt || ''}${t.liveDelay == null ? '' : html` · 延遲 ${secs(t.liveDelay)}`}`;
+  }
   return html`${dateShort(t.date)} ${t.stale ? '（舊資料）' : ''}`;
 }
 

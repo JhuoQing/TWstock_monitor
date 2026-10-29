@@ -83,6 +83,12 @@ export const symFile = (s) => String(s).replace(/\^/g, '_').replace(/=/g, '_').r
 
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
+/** 秒數 → '12 秒'／'2 分鐘'。 */
+export function secs(s) {
+  if (!ok(s)) return '';
+  return s < 60 ? `${Math.round(s)} 秒` : dur(s / 60);
+}
+
 /** 分鐘數 → '15 分鐘'／'3 小時'／'2 天'。 */
 export function dur(mins) {
   if (!ok(mins)) return '';
